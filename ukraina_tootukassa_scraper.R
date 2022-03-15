@@ -4,12 +4,20 @@ library(gsheet)
 
 myurl <- "https://www.onlineexpo.com/ee/tookohad-ukrainlaste-jaoks-eestis/tooandjad/"
 
-tööandjad <- myurl %>% 
+tooandjad <- myurl %>% 
   read_html() %>% 
   html_nodes(".ce1") %>% 
   html_text() %>% 
   as.data.frame() %>% 
-  rename(firma_nimi=1) 
+  rename(firma_nimi=1) %>% 
+  mutate(tookohalink = myurl %>% 
+           read_html() %>% 
+           html_nodes(".b1_url") %>% 
+           html_attr("href")
+           ) %>% 
+  mutate(tookohalink=paste0("https://www.onlineexpo.com", 
+                            tookohalink)
+  )
 
 myurl <- "https://www.onlineexpo.com/ee/tookohad-ukrainlaste-jaoks-eestis/toopakkumised/"
 
@@ -64,21 +72,38 @@ for (myurl in lingid_kokku$link)
     html_text() %>% 
     as.data.frame() %>% 
     rename(amet = 1) %>% 
-  mutate(ettevotte_link = ettevotte_link %>% 
-             str_remove("\\/.*\\/$")) %>% 
-    mutate(ettevotte_link = paste0("https://www.onlineexpo.com/ee/tookohad-ukrainlaste-jaoks-eestis/tooandjad/",ettevotte_link))%>% 
   mutate(kuulutuse_link= myurl)
   
 pakkumised_kokku <- bind_rows(pakkumised_kokku, kuulutus)
 
-print(n_distinct(pakkumised_kokku$link))
+print(n_distinct(pakkumised_kokku$kuulutuse_link))
                               
                   
 }
 
-failinimi =  paste0("pakkumised_", Sys.Date() %>% 
-  as.character(), 
-  ".csv")
+pakkumised_kokku  <- pakkumised_kokku %>% 
+  mutate(kuupaeva_seisuga = Sys.Date() %>% 
+           as.character()
+  )
+
+
+
 write_csv(pakkumised_kokku, failinimi)
   
-  
+pakkumised_kokku <- pakkumised_kokku %>% 
+  mutate(tookohalink=kuulutuse_link %>% 
+           str_remove_all("https://www.onlineexpo.com/ee/tookohad-ukrainlaste-jaoks-eestis/tooandjad/") %>% 
+           str_remove("\\/.*\\/$")) %>% 
+  mutate(tookohalink = paste0("https://www.onlineexpo.com/ee/tookohad-ukrainlaste-jaoks-eestis/tooandjad/", 
+                              tookohalink, 
+                              "/")
+  ) %>% 
+  left_join(tooandjad) %>% 
+  select(amet, firma_nimi, kuulutuse_link, firmalink=tookohalink, kuupaeva_seisuga)
+       
+failinimi = paste0("vanad_failid/",Sys.Date(), "_pakkumised.csv")
+
+write_csv(pakkumised_kokku, "viimane_pakkumised.csv") 
+write_csv(pakkumised_kokku, failinimi)
+
+
